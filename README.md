@@ -1,14 +1,14 @@
 # HoverPig
 This project is a remote controlled pig that is used for a teaching resoruce to train students in Vetinary science on how to snare and catch a pig.
 
-![HoverPig](images/hoverpig.png)
+![HoverPig](Images/hoverpig.png)
 
 ## ESP32 Controller 🎮
 To control the pig it uses a PS4 controller combined with a FREENOVE ESP32-WROOM and breakout board. It allows the user to use a PS4 controller to control outputs on the FREENOVE breakout board. Other controllers can be used, button assignments may need to be changed. When flashing the board select '_ESP32-WROOM-DA Module_' from the list of available boards manager. 
 
 Once flashed the PS4 controller can be paired by pressing and holding the share button and playstation logo  simultaneously. 
 
-![PS4 Controller](images/ps4_controller.jpg)
+![PS4 Controller](Images/ps4_controller.jpg)
 
 Features:
 - Users can trim the joystick position using R1 and L1 combined with the D-pad to trim the left and right joystick. This is implemented in the `GamepadController.cpp`. The remote should vibrate to indicate the trim is being adjusted. The trim is stored in `SPIFFS` as a `offsets.txt` file.
