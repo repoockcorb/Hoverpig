@@ -26,14 +26,14 @@ Table of Contents
 #### Videos:
 <table>
   <tr>
-    <td><a href="https://youtu.be/IgHCcj0NgWQ" title="Hovercar" rel="noopener"><img src="/docs/pictures/videos_preview/hovercar_intro.png"></a></td>
-    <td><a href="https://youtu.be/gtyqtc37r10" title="Cruise Control functionality" rel="noopener"><img src="/docs/pictures/videos_preview/cruise_control.png"></a></td>
-    <td><a href="https://youtu.be/jadD0M1VBoc" title="Hovercar pedal functionality" rel="noopener"><img src="/docs/pictures/videos_preview/hovercar_pedals.png"></a></td>
+    <td><a href="https://youtu.be/IgHCcj0NgWQ" title="Hovercar" rel="noopener"><img src="/hoverboard-firmware-hack-FOC/docs/pictures/videos_preview/hovercar_intro.png"></a></td>
+    <td><a href="https://youtu.be/gtyqtc37r10" title="Cruise Control functionality" rel="noopener"><img src="/hoverboard-firmware-hack-FOC/docs/pictures/videos_preview/cruise_control.png"></a></td>
+    <td><a href="https://youtu.be/jadD0M1VBoc" title="Hovercar pedal functionality" rel="noopener"><img src="/hoverboard-firmware-hack-FOC/docs/pictures/videos_preview/hovercar_pedals.png"></a></td>
   </tr>
   <tr>
-    <td><a href="https://youtu.be/UnlbMrCkjnE" title="Commutation vs. FOC (constant speed)" rel="noopener"><img src="/docs/pictures/videos_preview/com_foc_const.png"></a></td> 
-    <td><a href="https://youtu.be/V-_L2w10wZk" title="Commutation vs. FOC (variable speed)" rel="noopener"><img src="/docs/pictures/videos_preview/com_foc_var.png"></a></td>       
-    <td><a href="https://youtu.be/tVj_lpsRirA" title="Reliable Serial Communication" rel="noopener"><img src="/docs/pictures/videos_preview/serial_com.png"></a></td>
+    <td><a href="https://youtu.be/UnlbMrCkjnE" title="Commutation vs. FOC (constant speed)" rel="noopener"><img src="/hoverboard-firmware-hack-FOC/docs/pictures/videos_preview/com_foc_const.png"></a></td> 
+    <td><a href="https://youtu.be/V-_L2w10wZk" title="Commutation vs. FOC (variable speed)" rel="noopener"><img src="/hoverboard-firmware-hack-FOC/docs/pictures/videos_preview/com_foc_var.png"></a></td>       
+    <td><a href="https://youtu.be/tVj_lpsRirA" title="Reliable Serial Communication" rel="noopener"><img src="/hoverboard-firmware-hack-FOC/docs/pictures/videos_preview/serial_com.png"></a></td>
   </tr>
 </table>
 
@@ -41,7 +41,7 @@ Table of Contents
 ---
 ## Hardware
  
-![mainboard_pinout](/docs/pictures/mainboard_pinout.png)
+![mainboard_pinout](/hoverboard-firmware-hack-FOC/docs/pictures/mainboard_pinout.png)
 
 The original Hardware supports two 4-pin cables that originally were connected to the two sideboards. They break out GND, 12/15V and USART2&3 of the Hoverboard mainboard. Both USART2&3 support UART, PWM, PPM, and iBUS input. Additionally, the USART2 can be used as 12bit ADC, while USART3 can be used for I2C. Note that while USART3 (right sideboard cable) is 5V tolerant, USART2 (left sideboard cable) is **not** 5V tolerant.
 
@@ -83,7 +83,7 @@ In all FOC control modes, the controller features maximum motor speed and maximu
  - The Field Weakening is a linear interpolation from 0 to FIELD_WEAK_MAX or PHASE_ADV_MAX (depeding if FOC or SIN is selected, respectively)
  - The Field Weakening starts engaging at FIELD_WEAK_LO and reaches the maximum value at FIELD_WEAK_HI
  - The figure below shows different possible calibrations for Field Weakening / Phase Advance
- ![Field Weakening](/docs/pictures/FieldWeakening.png)
+ ![Field Weakening](/hoverboard-firmware-hack-FOC/docs/pictures/FieldWeakening.png)
  
  ⚠️ If you re-calibrate the Field Weakening please take all the safety measures! The motors can spin very fast!
  Power consumption will be highly increase and you can trigger the overvoltage protection of your BMS ⚠️
