@@ -40,7 +40,7 @@ Features:
 - number of poles `n_polePairs` for skateboard hub motors in `/src/BLDC_controller_data.c` being "15u -> 20U"
 - `CTRL_MOD_REQ` parameter changed in `/Inc/config.h` V `VLT_MODE -> SPD_MODE`
 
-When flashing the hoverboard controller follow the steps provided on the github repository. Note that the hoverboards can be locked preventing flashing and will need to be unlocked using the `STM32CubeProgrammer` software. For information how to do this follow this [tutorial](https://youtu.be/77bMH5Ql1Xo?si=E0nV6sFRmLHlkzPF&t=290).
+When flashing the hoverboard controller follow the steps provided on the github repository. Note that the hoverboards can be locked preventing flashing and will need to be unlocked using the [STM32CubeProgrammer Software](https://www.st.com/en/development-tools/stm32cubeprog.html). For information how to do this follow this [tutorial](https://youtu.be/77bMH5Ql1Xo?si=E0nV6sFRmLHlkzPF&t=290).
 
 __NOTE:__ Not not all esp32 boards are compatible with the Bluetooth gamepads see compatible boards and gamepads below. For more information see [docs](https://bluepad32.readthedocs.io/en/latest/supported_gamepads/).
 
