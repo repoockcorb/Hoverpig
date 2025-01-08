@@ -1,5 +1,5 @@
 # HoverPig
-This project is a remote controlled pig that is used for a teaching resoruce to train students in Vetinary science on how to snare and catch a pig.
+This project is a remote controlled pig that is used for a teaching resource to train students in Veterinary science on how to snare and catch/handle a pig.
 
 ![HoverPig](Images/hoverpig.png)
 
