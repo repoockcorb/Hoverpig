@@ -3,6 +3,7 @@
 #include "AudioPlayer.h"
 #include "MotorController.h"
 #include <ESP32Servo.h>
+#include "DFRobotDFPlayerMini.h"
 
 #include "esp_system.h"
 #include "esp_task_wdt.h"  // Include the watchdog timer library
@@ -42,15 +43,29 @@ void loop() {
 
   // Check if the gamepad is connected and valid
   if (myGamepad) {
-
-    // Check specific buttons
-    if (myGamepad->a()) {
-      Serial.println("A button is pressed");
-      loopAudio();  // Call loopAudio only if A button is pressed
-      // playCurrentFile();
-    } else {
-      // Serial.println("A button is not pressed");
+    
+    // Track button state for A button
+    static bool aButtonPrevState = false;
+    bool aButtonCurrState = myGamepad->r1();
+    
+    // Check for button press (transition from not pressed to pressed)
+    if (aButtonCurrState && !aButtonPrevState) {
+      Serial.println("A button is pressed - playing a random audio file");
+      
+      // Only start a new file if nothing is currently playing
+      if (!isPlaying) {
+        playRandomFile();
+      }
     }
+    
+    // We don't need to stop playback on button release anymore
+    // The file will play to completion and then stop automatically
+    
+    // Always call loopAudio to handle ongoing playback and events
+    loopAudio();
+    
+    // Update previous button state
+    aButtonPrevState = aButtonCurrState;
 
     unsigned long timeNow = millis();
 

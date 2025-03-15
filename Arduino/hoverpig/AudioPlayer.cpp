@@ -1,406 +1,223 @@
 #include "AudioPlayer.h"
 
-File WavFile;
-struct WavHeader_Struct WavHeader;
+// Create the HardwareSerial and DFPlayer objects
+// Use Serial2 for the DFPlayer Mini
+HardwareSerial audioSerial(2); // Using Serial2
+DFRobotDFPlayerMini audioPlayer;
 
-const char* wavFiles[] = { "/1.wav", "/2.wav", "/3.wav", "/4.wav", "/5.wav" };
-int currentFileIndex = 0;
-const int numFiles = sizeof(wavFiles) / sizeof(wavFiles[0]);
-
-static const i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
-    .sample_rate = 44100, // Default sample rate, will be updated later
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-    .communication_format = (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
-    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-    .dma_buf_count = 8,
-    .dma_buf_len = 64,
-    .use_apll=0,
-    .tx_desc_auto_clear= true,
-    .fixed_mclk=-1    
-};
-
-static const i2s_pin_config_t pin_config = {
-    .bck_io_num = I2S_BCLK,
-    .ws_io_num = I2S_LRC,
-    .data_out_num = I2S_DOUT,
-    .data_in_num = I2S_PIN_NO_CHANGE
-};
+// File management
+const int numFiles = 5; // Total number of MP3 files on the SD card
+int currentFileIndex = 1; // DFPlayer uses 1-based indexing for files
+bool isPlaying = false;  // Track if audio is currently playing
 
 void setupAudio() {
-    Serial.begin(115200);
-    SDCardInit();
-    i2s_driver_install(I2S_NUM, &i2s_config, 0, NULL);
-    i2s_set_pin(I2S_NUM, &pin_config);
-
-    playCurrentFile();
+  Serial.println("Initializing DFPlayer Mini...");
+  
+  // Initialize serial communication with DFPlayer Mini
+  // DFPlayer Mini requires 9600 baud rate
+  audioSerial.begin(9600, SERIAL_8N1, PIN_MP3_RX, PIN_MP3_TX);
+  delay(1000); // Give it time to initialize
+  
+  // Start communication with DFPlayer Mini
+  if (audioPlayer.begin(audioSerial)) {
+    Serial.println("DFPlayer Mini initialized successfully");
+    
+    // Set volume (0-30)
+    audioPlayer.volume(20);
+    Serial.println("Volume set to 20");
+    
+    // Check SD card and files
+    checkSDCard();
+    
+    // Initialize random seed using analog noise from an unconnected pin
+    randomSeed(analogRead(A0));
+    
+    // Don't automatically play - wait for button press
+    Serial.println("Audio ready - press A button to play a random file");
+  } else {
+    Serial.println("Failed to initialize DFPlayer Mini!");
+    Serial.println("Please check connections and SD card");
+    
+    // Try to diagnose the issue
+    Serial.println("Troubleshooting tips:");
+    Serial.println("1. Make sure SD card is formatted as FAT16/FAT32");
+    Serial.println("2. Files should be named 001.mp3, 002.mp3, etc.");
+    Serial.println("3. Check RX/TX connections are correct");
+    Serial.println("4. Verify SD card is properly inserted");
+    
+    // Try to reset the DFPlayer
+    Serial.println("Attempting to reset DFPlayer...");
+    audioPlayer.reset();
+    delay(2000);
+    if (audioPlayer.begin(audioSerial)) {
+      Serial.println("DFPlayer reset successful!");
+    } else {
+      Serial.println("DFPlayer reset failed.");
+    }
+  }
 }
 
-void playCurrentFile() {
-    WavFile = SD.open(wavFiles[currentFileIndex]);
-    
-    if (!WavFile) {
-        Serial.printf("Could not open '%s'\n", wavFiles[currentFileIndex]);
-        return;
-    }
-    
-    WavFile.read((byte*)&WavHeader, 44);
-    DumpWAVHeader(&WavHeader);
-
-    if (ValidWavData(&WavHeader)) {
-        uint32_t adjustedSampleRate = WavHeader.SampleRate / 2; // Slow down by half
-        Serial.printf("Setting sample rate to %u (original: %u)\n", adjustedSampleRate, WavHeader.SampleRate);
-        i2s_set_sample_rates(I2S_NUM, adjustedSampleRate);
-    }
+void checkSDCard() {
+  // Check SD card status
+  if (audioPlayer.available()) {
+    Serial.println("SD card is available");
+  } else {
+    Serial.println("SD card might not be detected");
+  }
+  
+  // List the number of files
+  uint16_t fileCount = audioPlayer.readFileCounts();
+  Serial.print("Number of files on SD card: ");
+  Serial.println(fileCount);
+  
+  if (fileCount == 0) {
+    Serial.println("No files found! Please check that:");
+    Serial.println("1. SD card is formatted as FAT16/FAT32");
+    Serial.println("2. Files are in the root directory");
+    Serial.println("3. Files are named 001.mp3, 002.mp3, etc.");
+    Serial.println("4. Files are valid MP3 format");
+  } else {
+    Serial.println("Files detected on SD card");
+  }
 }
 
 void loopAudio() {
-    PlayWav();
-}
-
-void PlayWav() {
-    static bool ReadingFile = true;
-    static byte Samples[NUM_BYTES_TO_READ_FROM_FILE];
-    static uint16_t BytesRead;
-
-    if (ReadingFile) {
-        BytesRead = ReadFile(Samples);
-        ReadingFile = false;
-    } else {
-        ReadingFile = FillI2SBuffer(Samples, BytesRead);
-    }
-}
-
-uint16_t ReadFile(byte* Samples) {
-    static uint32_t BytesReadSoFar = 0;
-    uint16_t BytesToRead;
-
-    if (BytesReadSoFar + NUM_BYTES_TO_READ_FROM_FILE > WavHeader.DataSize) {
-        BytesToRead = WavHeader.DataSize - BytesReadSoFar;
-    } else {
-        BytesToRead = NUM_BYTES_TO_READ_FROM_FILE;
-    }
+  // This function is called in the main loop to handle DFPlayer events
+  
+  // Check for DFPlayer Mini errors and events
+  if (audioPlayer.available()) {
+    uint8_t type = audioPlayer.readType();
+    int value = audioPlayer.read();
     
-    WavFile.read(Samples, BytesToRead);
-    BytesReadSoFar += BytesToRead;
-
-    if (BytesReadSoFar >= WavHeader.DataSize) {
-        // Close the current file and move to the next one
-        delay(2000);
-        WavFile.close();
-        BytesReadSoFar = 0;
-        nextFile();
+    switch (type) {
+      case DFPlayerError:
+        Serial.print("DFPlayer Error: ");
+        switch (value) {
+          case Busy:
+            Serial.println("Card not found");
+            break;
+          case Sleeping:
+            Serial.println("Sleeping");
+            break;
+          case SerialWrongStack:
+            Serial.println("Get Wrong Stack");
+            break;
+          case CheckSumNotMatch:
+            Serial.println("Check Sum Not Match");
+            break;
+          case FileIndexOut:
+            Serial.println("File Index Out of Bound");
+            break;
+          case FileMismatch:
+            Serial.println("Cannot Find File");
+            break;
+          case Advertise:
+            Serial.println("In Advertise");
+            break;
+          default:
+            Serial.println("Unknown error");
+            break;
+        }
+        break;
+      case DFPlayerPlayFinished:
+        Serial.print("Play finished for file: ");
+        Serial.println(value);
+        // Mark as not playing when finished
+        isPlaying = false;
+        Serial.println("Ready for next button press to play a random file");
+        break;
     }
-    return BytesToRead;
+  }
+}
+
+void playRandomFile() {
+  // Get the total number of files
+  uint16_t fileCount = audioPlayer.readFileCounts();
+  
+  if (fileCount > 0) {
+    // Generate a random file index between 1 and fileCount (inclusive)
+    int randomIndex = random(1, fileCount + 1);
+    
+    Serial.print("Playing random file: ");
+    Serial.println(randomIndex);
+    
+    // Play the random file
+    audioPlayer.play(randomIndex);
+    isPlaying = true;
+    
+    // Additional debug info
+    if (audioPlayer.available()) {
+      Serial.println("Player is available after play command");
+    } else {
+      Serial.println("Player might be busy or not responding");
+      
+      // Try alternative play method
+      Serial.println("Trying alternative play method...");
+      audioPlayer.playFolder(1, randomIndex);
+      delay(100);
+      
+      // Check if that worked
+      if (audioPlayer.available()) {
+        Serial.println("Alternative play method seems to have worked");
+      }
+    }
+  } else {
+    Serial.println("No files found on SD card!");
+  }
+}
+
+void playCurrentFile() {
+  Serial.print("Playing file: ");
+  Serial.println(currentFileIndex);
+  
+  // Try to play the file
+  audioPlayer.play(currentFileIndex);
+  isPlaying = true;
+  
+  // Additional debug info
+  if (audioPlayer.available()) {
+    Serial.println("Player is available after play command");
+  } else {
+    Serial.println("Player might be busy or not responding");
+    
+    // Try alternative play method
+    Serial.println("Trying alternative play method...");
+    audioPlayer.playFolder(1, currentFileIndex);
+    delay(100);
+    
+    // Check if that worked
+    if (audioPlayer.available()) {
+      Serial.println("Alternative play method seems to have worked");
+    }
+  }
+}
+
+void stopPlayback() {
+  if (isPlaying) {
+    Serial.println("Stopping audio playback");
+    audioPlayer.pause();
+    isPlaying = false;
+  }
+}
+
+void resumePlayback() {
+  if (!isPlaying) {
+    Serial.println("Resuming audio playback");
+    audioPlayer.start();
+    isPlaying = true;
+  }
 }
 
 void nextFile() {
-    // Increment file index and loop back to the beginning if needed
-    currentFileIndex = (currentFileIndex + 1) % numFiles;
-    playCurrentFile();
+  // Move to the next file (with wrap-around)
+  currentFileIndex = (currentFileIndex % numFiles) + 1;
+  playCurrentFile();
 }
 
-bool FillI2SBuffer(byte* Samples, uint16_t BytesInBuffer) {
-    size_t BytesWritten;
-    static uint16_t BufferIdx = 0;
-    uint8_t* DataPtr = Samples + BufferIdx;
-    uint16_t BytesToSend = BytesInBuffer - BufferIdx;
-    if (i2s_write(I2S_NUM, DataPtr, BytesToSend, &BytesWritten, portMAX_DELAY) == ESP_OK) {
-        BufferIdx += BytesWritten;
-    } else {
-        Serial.println("Error writing to I2S");
-    }
-
-    if (BufferIdx >= BytesInBuffer) {
-        BufferIdx = 0;
-        return true;
-    } else {
-        return false;
-    }
+void setVolume(uint8_t volume) {
+  // Ensure volume is within valid range (0-30)
+  if (volume > 30) volume = 30;
+  audioPlayer.volume(volume);
+  Serial.print("Volume set to: ");
+  Serial.println(volume);
 }
-
-
-void SDCardInit() {        
-    pinMode(SD_CS, OUTPUT); 
-    digitalWrite(SD_CS, HIGH);
-    if (!SD.begin(SD_CS)) {
-        Serial.println("Error talking to SD card!");
-        while (true);
-    }
-}
-
-bool ValidWavData(struct WavHeader_Struct* Wav) {
-    if (memcmp(Wav->RIFFSectionID, "RIFF", 4) != 0) {    
-        Serial.println("Invalid data - Not RIFF format");
-        return false;
-    }
-    if (memcmp(Wav->RiffFormat, "WAVE", 4) != 0) {
-        Serial.println("Invalid data - Not Wave file");
-        return false;
-    }
-    if (memcmp(Wav->FormatSectionID, "fmt", 3) != 0) {
-        Serial.println("Invalid data - No format section found");
-        return false;
-    }
-    if (memcmp(Wav->DataSectionID, "data", 4) != 0) {
-        Serial.println("Invalid data - data section not found");
-        return false;
-    }
-    if (Wav->FormatID != 1) {
-        Serial.println("Invalid data - format Id must be 1");
-        return false;
-    }
-    if (Wav->FormatSize != 16) {
-        Serial.println("Invalid data - format section size must be 16.");
-        return false;
-    }
-    if ((Wav->NumChannels != 1) && (Wav->NumChannels != 2)) {
-        Serial.println("Invalid data - only mono or stereo permitted.");
-        return false;
-    }
-    if (Wav->SampleRate > 48000) {
-        Serial.println("Invalid data - Sample rate cannot be greater than 48000");
-        return false;
-    }
-    if ((Wav->BitsPerSample != 8) && (Wav->BitsPerSample != 16)) {
-        Serial.println("Invalid data - Only 8 or 16 bits per sample permitted.");
-        return false;
-    }
-    return true;
-}
-
-void DumpWAVHeader(struct WavHeader_Struct* Wav) {
-    Serial.print("RIFFSectionID: ");
-    PrintData(Wav->RIFFSectionID, 4);
-    Serial.print("Size: ");
-    Serial.println(Wav->Size);
-    Serial.print("RiffFormat: ");
-    PrintData(Wav->RiffFormat, 4);
-    Serial.print("FormatSectionID: ");
-    PrintData(Wav->FormatSectionID, 4);
-    Serial.print("FormatSize: ");
-    Serial.println(Wav->FormatSize);
-    Serial.print("FormatID: ");
-    Serial.println(Wav->FormatID);
-    Serial.print("NumChannels: ");
-    Serial.println(Wav->NumChannels);
-    Serial.print("SampleRate: ");
-    Serial.println(Wav->SampleRate);
-    Serial.print("ByteRate: ");
-    Serial.println(Wav->ByteRate);
-    Serial.print("BlockAlign: ");
-    Serial.println(Wav->BlockAlign);
-    Serial.print("BitsPerSample: ");
-    Serial.println(Wav->BitsPerSample);
-    Serial.print("DataSectionID: ");
-    PrintData(Wav->DataSectionID, 4);
-    Serial.print("DataSize: ");
-    Serial.println(Wav->DataSize);
-}
-
-void PrintData(const char* Data, uint8_t NumBytes) {
-    for (uint8_t i = 0; i < NumBytes; i++) {
-        Serial.print(Data[i]); 
-    }
-    Serial.println();
-}
-
-
-
-
-
-
-
-
-
-// #include "AudioPlayer.h"
-
-// File WavFile;
-// struct WavHeader_Struct WavHeader;
-
-// static const i2s_config_t i2s_config = {
-//     .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
-//     .sample_rate = 44100, // Default sample rate, will be updated later
-//     .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-//     .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-//     .communication_format = (i2s_comm_format_t)(I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB),
-//     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-//     .dma_buf_count = 8,
-//     .dma_buf_len = 64,
-//     .use_apll=0,
-//     .tx_desc_auto_clear= true,
-//     .fixed_mclk=-1    
-// };
-
-// static const i2s_pin_config_t pin_config = {
-//     .bck_io_num = I2S_BCLK,
-//     .ws_io_num = I2S_LRC,
-//     .data_out_num = I2S_DOUT,
-//     .data_in_num = I2S_PIN_NO_CHANGE
-// };
-
-// void setupAudio() {
-//     Serial.begin(115200);
-//     SDCardInit();
-//     i2s_driver_install(I2S_NUM, &i2s_config, 0, NULL);
-//     i2s_set_pin(I2S_NUM, &pin_config);
-
-//     // WavFile = SD.open("/StarWars60.wav");
-//     WavFile = SD.open("/StarWars60.wav");
-
-//     // 1.wav, 2.wav, 3.wav, 4.wav, 5.wav
-
-//     if (!WavFile) {
-//         Serial.println("Could not open 'StarWars60.wav'");
-//         return;
-//     }
-    
-//     WavFile.read((byte*)&WavHeader, 44);
-//     DumpWAVHeader(&WavHeader);
-
-//     if (ValidWavData(&WavHeader)) {
-//         uint32_t adjustedSampleRate = WavHeader.SampleRate / 2; // Slow down by half
-//         // uint32_t adjustedSampleRate = WavHeader.SampleRate; // Slow down by half
-//         Serial.printf("Setting sample rate to %u (original: %u)\n", adjustedSampleRate, WavHeader.SampleRate);
-//         i2s_set_sample_rates(I2S_NUM, adjustedSampleRate);
-//     }
-// }
-
-// void loopAudio() {
-//     PlayWav();
-// }
-
-// void PlayWav() {
-//     static bool ReadingFile = true;
-//     static byte Samples[NUM_BYTES_TO_READ_FROM_FILE];
-//     static uint16_t BytesRead;
-
-//     if (ReadingFile) {
-//         BytesRead = ReadFile(Samples);
-//         ReadingFile = false;
-//     } else {
-//         ReadingFile = FillI2SBuffer(Samples, BytesRead);
-//     }
-// }
-
-// uint16_t ReadFile(byte* Samples) {
-//     static uint32_t BytesReadSoFar = 0;
-//     uint16_t BytesToRead;
-
-//     if (BytesReadSoFar + NUM_BYTES_TO_READ_FROM_FILE > WavHeader.DataSize) {
-//         BytesToRead = WavHeader.DataSize - BytesReadSoFar;
-//     } else {
-//         BytesToRead = NUM_BYTES_TO_READ_FROM_FILE;
-//     }
-    
-//     WavFile.read(Samples, BytesToRead);
-//     BytesReadSoFar += BytesToRead;
-
-//     if (BytesReadSoFar >= WavHeader.DataSize) {
-//         WavFile.seek(44);
-//         BytesReadSoFar = 0;
-//     }
-//     return BytesToRead;
-// }
-
-// bool FillI2SBuffer(byte* Samples, uint16_t BytesInBuffer) {
-//     size_t BytesWritten;
-//     static uint16_t BufferIdx = 0;
-//     uint8_t* DataPtr = Samples + BufferIdx;
-//     uint16_t BytesToSend = BytesInBuffer - BufferIdx;
-//     i2s_write(I2S_NUM, DataPtr, BytesToSend, &BytesWritten, 1);
-//     BufferIdx += BytesWritten;
-
-//     if (BufferIdx >= BytesInBuffer) {
-//         BufferIdx = 0;
-//         return true;
-//     } else {
-//         return false;
-//     }
-// }
-
-// void SDCardInit() {        
-//     pinMode(SD_CS, OUTPUT); 
-//     digitalWrite(SD_CS, HIGH);
-//     if (!SD.begin(SD_CS)) {
-//         Serial.println("Error talking to SD card!");
-//         while (true);
-//     }
-// }
-
-// bool ValidWavData(struct WavHeader_Struct* Wav) {
-//     if (memcmp(Wav->RIFFSectionID, "RIFF", 4) != 0) {    
-//         Serial.println("Invalid data - Not RIFF format");
-//         return false;
-//     }
-//     if (memcmp(Wav->RiffFormat, "WAVE", 4) != 0) {
-//         Serial.println("Invalid data - Not Wave file");
-//         return false;
-//     }
-//     if (memcmp(Wav->FormatSectionID, "fmt", 3) != 0) {
-//         Serial.println("Invalid data - No format section found");
-//         return false;
-//     }
-//     if (memcmp(Wav->DataSectionID, "data", 4) != 0) {
-//         Serial.println("Invalid data - data section not found");
-//         return false;
-//     }
-//     if (Wav->FormatID != 1) {
-//         Serial.println("Invalid data - format Id must be 1");
-//         return false;
-//     }
-//     if (Wav->FormatSize != 16) {
-//         Serial.println("Invalid data - format section size must be 16.");
-//         return false;
-//     }
-//     if ((Wav->NumChannels != 1) && (Wav->NumChannels != 2)) {
-//         Serial.println("Invalid data - only mono or stereo permitted.");
-//         return false;
-//     }
-//     if (Wav->SampleRate > 48000) {
-//         Serial.println("Invalid data - Sample rate cannot be greater than 48000");
-//         return false;
-//     }
-//     if ((Wav->BitsPerSample != 8) && (Wav->BitsPerSample != 16)) {
-//         Serial.println("Invalid data - Only 8 or 16 bits per sample permitted.");
-//         return false;
-//     }
-//     return true;
-// }
-
-// void DumpWAVHeader(struct WavHeader_Struct* Wav) {
-//     Serial.print("RIFFSectionID: ");
-//     PrintData(Wav->RIFFSectionID, 4);
-//     Serial.print("Size: ");
-//     Serial.println(Wav->Size);
-//     Serial.print("RiffFormat: ");
-//     PrintData(Wav->RiffFormat, 4);
-//     Serial.print("FormatSectionID: ");
-//     PrintData(Wav->FormatSectionID, 4);
-//     Serial.print("FormatSize: ");
-//     Serial.println(Wav->FormatSize);
-//     Serial.print("FormatID: ");
-//     Serial.println(Wav->FormatID);
-//     Serial.print("NumChannels: ");
-//     Serial.println(Wav->NumChannels);
-//     Serial.print("SampleRate: ");
-//     Serial.println(Wav->SampleRate);
-//     Serial.print("ByteRate: ");
-//     Serial.println(Wav->ByteRate);
-//     Serial.print("BlockAlign: ");
-//     Serial.println(Wav->BlockAlign);
-//     Serial.print("BitsPerSample: ");
-//     Serial.println(Wav->BitsPerSample);
-//     Serial.print("DataSectionID: ");
-//     PrintData(Wav->DataSectionID, 4);
-//     Serial.print("DataSize: ");
-//     Serial.println(Wav->DataSize);
-// }
-
-// void PrintData(const char* Data, uint8_t NumBytes) {
-//     for (uint8_t i = 0; i < NumBytes; i++) {
-//         Serial.print(Data[i]); 
-//     }
-//     Serial.println();
-// }
