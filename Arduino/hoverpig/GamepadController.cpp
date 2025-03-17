@@ -98,7 +98,7 @@ void loopGamepadController() {
 
         // Print output if any button is pressed or any joystick/trigger is moved
         if (output != "") {
-            Serial.println(output);
+            // Serial.println(output);
         }
     }
 }
