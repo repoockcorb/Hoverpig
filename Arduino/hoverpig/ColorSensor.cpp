@@ -458,10 +458,10 @@ void updateColorSensor() {
         colorChanged = true;
         
         // ALWAYS print when color changes - this is the only output the user wants
-        Serial.print("Color changed: ");
-        Serial.print(previousColorName);
-        Serial.print(" -> ");
-        Serial.println(currentColorName);
+        // Serial.print("Color changed: ");
+        // Serial.print(previousColorName);
+        // Serial.print(" -> ");
+        // Serial.println(currentColorName);
         
         // Check for red detection - immediate reaction
         if (currentColorName == "Red" && previousColorName != "Red" && !controllerConnecting) {
