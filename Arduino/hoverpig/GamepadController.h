@@ -29,5 +29,6 @@ void adjustRightStickOffsets();
 // Callback function declarations
 void onConnectedGamepad(GamepadPtr gp);
 void onDisconnectedGamepad(GamepadPtr gp);
+void onConnectedGamepadModified(GamepadPtr gp); // Modified version that handles connection safely
 
 #endif // GAMEPADCONTROLLER_H
