@@ -99,7 +99,7 @@ void loop() {
       // motor_drive = map(deadzonedAxisY, -500, 500, -120, 120);
       // motor_steer = map(deadzonedAxisRX, -500, 500, -100, 100);
       motor_drive = map(deadzonedAxisY, -500, 500, -285, 285);
-      motor_steer = map(deadzonedAxisRX, -500, 500, -130, 130);
+      motor_steer = map(deadzonedAxisRX, -500, 500, -200, 200);
       if (update_remote_led == 1) {
         myGamepad->setColorLED(0, 255, 0);  // Green color
         Serial.print("updated led color");

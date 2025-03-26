@@ -23,8 +23,8 @@ void setupAudio() {
     Serial.println("DFPlayer Mini initialized successfully");
     
     // Set volume (0-30)
-    audioPlayer.volume(20);
-    Serial.println("Volume set to 20");
+    audioPlayer.volume(30);
+    Serial.println("Volume set to 30");
     
     // Check SD card and files
     checkSDCard();
