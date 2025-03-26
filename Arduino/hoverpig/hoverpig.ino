@@ -35,10 +35,10 @@ int motor_speed = 0;
 int update_remote_led = 1;
 
 // Boost settings
-const int BOOST_SPEED_ADD = 120;                       // Fixed value to add during boost
-const int MAX_BOOST_SPEED = -450;                     // Maximum allowed speed during boost
+const int BOOST_SPEED_ADD = 120;                     // Fixed value to add during boost
+const int MAX_BOOST_SPEED = -450;                    // Maximum allowed speed during boost
 const unsigned long BOOST_DURATION_AFTER_RED = 500;  // How long boost continues after leaving red (ms)
-unsigned long lastBoostColorTime = 0;                 // Track when we last saw a boost color
+unsigned long lastBoostColorTime = 0;                // Track when we last saw a boost color
 
 // LED update timing
 const unsigned long LED_UPDATE_INTERVAL = 80;  // Reduced frequency for more responsive updates
@@ -139,6 +139,36 @@ void controllerTask(void *pvParameters) {
 
     // If we have a gamepad, process inputs
     if (myGamepad && myGamepad->isConnected()) {
+
+      // Track button state for A button
+      static bool aButtonPrevState = false;
+      bool aButtonCurrState = myGamepad->r1();
+
+      // Check for button press (transition from not pressed to pressed)
+      if (aButtonCurrState && !aButtonPrevState) {
+        Serial.println("A button is pressed - playing a random audio file");
+
+        // Only start a new file if nothing is currently playing
+        if (!isPlaying) {
+          playRandomFile();
+        }
+      }
+
+      // We don't need to stop playback on button release anymore
+      // The file will play to completion and then stop automatically
+
+      // Always call loopAudio to handle ongoing playback and events
+      loopAudio();
+
+      // Update previous button state
+      aButtonPrevState = aButtonCurrState;
+
+      unsigned long timeNow = millis();
+
+      // Check for new received data
+      Receive();
+
+
       // Apply deadzone logic to the axis values
       int16_t axisYRaw = myGamepad->axisY() + leftJoystickYOffset;
       int16_t axisRXRaw = myGamepad->axisRX() + rightJoystickXOffset;
@@ -217,7 +247,7 @@ void controllerTask(void *pvParameters) {
       }
 
       // Update audio state to handle playing sounds
-      updateAudio();
+      // updateAudio();
 
       // Simplified LED update with much lower frequency
       if (currentTime - lastLedUpdateTime > LED_UPDATE_INTERVAL || hasColorChanged()) {
@@ -258,20 +288,6 @@ void controllerTask(void *pvParameters) {
       // Handle button presses for sound playback and calibration
       if (myGamepad && myGamepad->isConnected()) {
 
-        // R1 button (by itself) - play random sound
-        if (myGamepad->r1() && currentTime - buttonlastDebounceTime > BUTTON_DEBOUNCE_DELAY) {
-          // Get the total number of available sounds (at least 1)
-          uint16_t maxSounds = getTotalSoundCount();
-
-          // Play a random sound from available files
-          uint8_t randomSound = random(1, min(maxSounds + 1, 256));  // Stay within uint8_t range (1-255)
-          playFile(randomSound);
-          buttonlastDebounceTime = currentTime;
-          Serial.print("R1 button pressed - playing random sound #");
-          Serial.print(randomSound);
-          Serial.print(" of ");
-          Serial.println(maxSounds);
-        }
 
         // L2+R2 buttons - start calibration
         if (myGamepad->l2() && myGamepad->r2() && currentTime - buttonlastDebounceTime > BUTTON_DEBOUNCE_DELAY) {

@@ -480,7 +480,7 @@ void updateColorSensor() {
             } 
             // Then handle audio playback if rumble is already started
             else if (!isPlaying) {
-              playFile(3); // Play the specific file #3
+              // playFile(3); // Play the specific file #3
               lastBtOperation = currentTime;
             }
           }
